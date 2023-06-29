@@ -1,5 +1,4 @@
 import ccxt.pro
-import threading
 import time
 
 def run():
@@ -75,6 +74,28 @@ def get_ordering(arb_list, graph):
     return first_pair, second_pair, third_pair
 
 
+def retrieve_prices(exchange1, final_arb_list):
+    i = 0
+    exch_rate_list = []
+    no_current_flag = False
+    for pricepair in final_arb_list:
+        order_book = exchange1.fetch_order_book(pricepair)
+        if(i==2):
+            if len(order_book['asks'])==0:
+                print("No current ASKS !!\n##########################################################################\n")
+                no_current_flag = True
+                break
+            exch_rate_list.append(order_book['asks'][0][0])
+        else:   
+            if len(order_book['bids'])==0:
+                print("No current BIDS !!\n##########################################################################\n")
+                no_current_flag = True
+                break
+            exch_rate_list.append(order_book['bids'][0][0])
+        i+=1
+    return exch_rate_list, no_current_flag
+
+
 def evaluate_profit(exch_rate_list):
     print("Current exchange rates: " + str(exch_rate_list))
 
@@ -95,8 +116,8 @@ def finder(exchange_name, unavailable_exchanges):
         print("Skipping exchange: ", exchange_name)
     else:
         print("\n<----------------------Exchange found: ", exchange1, "-------------------------->")
-        print("Available currency pairs data: ", exchange1.symbols) 
-
+        print("Available currency pairs data: ", symbols) 
+        print("Number of currency pairs = ", len(symbols))
         graph = create_graph(symbols)
         
         list_of_threes = find_transitive_sets(graph)
@@ -113,30 +134,14 @@ def finder(exchange_name, unavailable_exchanges):
                 final_arb_list = [first_pair, second_pair, third_pair]
                 print("Cycle ", cycle_count)
                 print("List of Arbitrage Symbols in order [a,b,c] (a->b->c->a) : ", final_arb_list)
-
-            exch_rate_list = []
-            i = 0
-            no_current_flag = False
-            for pricepair in final_arb_list:
-                order_book = exchange1.fetch_order_book(pricepair)
-                if(i==2):
-                    if len(order_book['asks'])==0:
-                        print("No current ASKS !!\n##########################################################################\n")
-                        no_current_flag = True
-                        break
-                    exch_rate_list.append(order_book['asks'][0][0])
-                else:   
-                    if len(order_book['bids'])==0:
-                        print("No current BIDS !!\n##########################################################################\n")
-                        no_current_flag = True
-                        break
-                    exch_rate_list.append(order_book['bids'][0][0])
-                i+=1
+            
+            exch_rate_list, no_current_flag  = retrieve_prices(exchange1, final_arb_list)
             
             if(no_current_flag):
                 return
             else:
                 evaluate_profit(exch_rate_list)
+
 
 def arbitrage():
 
@@ -144,6 +149,7 @@ def arbitrage():
     unavailable_exchanges = ["bitstamp1"]
     for exchange_name in ccxt.exchanges: 
         finder(exchange_name, unavailable_exchanges)
+
 
 if __name__ == "__main__":
     run()
